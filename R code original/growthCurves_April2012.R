@@ -1,36 +1,3 @@
-<<<<<<< HEAD
-# Author unknown
-# edited by Prashant (Shamoo Lab at Rice University)
-# (version 1.3g-120411) <- obsolete number
-
-library(lattice)
-library(reshape2)
-library(readxl)
-# library(lubridate)
-
-
-# convert time data from hh:mm:ss to seconds
-# seconds <- function(time) {
-#     t = as.numeric(noquote(unlist(strsplit(sub("\\.", ":", paste(time)), split=':', fixed=T))))   
-#     min = NULL 
-#     if (length(t) >= 3) {
-#         min = t[1]*60*60+t[2]*60+t[3]
-#     } else {
-#         min = t[1]*60+t[2]
-#     }
-#     
-#     return(min)
-# }
-
-seconds<- function(time){
-  sec <- as.numeric(format(time, "%H")) * 3600 + as.numeric(format(time, "%M"))*60 + as.numeric(format(time, "%S"))
-}
-
-get_seconds <- function(x) { # requires library(lubridate)
-  second(x) + minute(x)*60 + hour(x)*3600
-  }
-
-=======
 # version 1.3g-120411
 
 
@@ -51,7 +18,6 @@ seconds <- function(time) {
     return(min)
 }
 
->>>>>>> 9ed833cf0f4afe6e523fab255b47a62959d053ab
 minutesAndSeconds <- function(seconds) {
     return(c(seconds%/%60, seconds%%60))
 }
@@ -260,21 +226,12 @@ wellNames = NULL
 # models <- list()
 
 
-<<<<<<< HEAD
-# Convert plate reader excel file into CSV and input into the program
-analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=c(), twoResourceWells=c("ALL"), plotDetail=F, reload=T, smoothWindowSize=7, maxOD=0.45, ODTicks=c(0.1,0.2,0.4), maxTimeHours=15, timeTicks=c(0,5,10,15), rSquaredTreshold=0.85, maxWells=96, selwyn=F) {
-  
-=======
 
 analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=c(), twoResourceWells=c("ALL"), plotDetail=F, reload=T, smoothWindowSize=7, maxOD=0.45, ODTicks=c(0.1,0.2,0.4), maxTimeHours=15, timeTicks=c(0,5,10,15), rSquaredTreshold=0.85, maxWells=96, selwyn=F) {
-
->>>>>>> 9ed833cf0f4afe6e523fab255b47a62959d053ab
-# Prelims -----------------------------------------------------------------
-
 
     ptm <- proc.time()
   
-    # constants
+    # constants####
     modelCol = rgb(0.2,0.9,0.2)
     modelColLight = rgb(0.6,1.0,0.6)
     maxTimeSeconds = maxTimeHours*60*60
@@ -323,11 +280,7 @@ analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=
     
 
 
-<<<<<<< HEAD
-    dataFile = unlist(strsplit(dataFileName, split=".csv", fixed=T))
-=======
     dataFile = unlist(strsplit(dataFileName, split=".txt", fixed=T))
->>>>>>> 9ed833cf0f4afe6e523fab255b47a62959d053ab
     
     wellsWithZeros = NULL
     if (reload) {
@@ -345,17 +298,6 @@ analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=
 
         message("Loading data from [", dataFileName, "]")
         if (!selwyn) {
-<<<<<<< HEAD
-            data <<- read_excel(dataFileName, skip=57)[-1]
-			
-            emptyRows=which(is.na(data$H12)) # get rid of empty rows in the data
-            if (length(emptyRows) != 0) {
-              data <<- read_excel(dataFileName, n_max = emptyRows[1]-1, skip=57) 
-            }
-            
-            data <- as.data.frame(data) # read_excel outputs a tibble - convert it back to data frame
-            
-=======
             data <<- read.table(dataFileName, header=T, skip=2, fill=T, fileEncoding = "latin1")
 			
             emptyRows=which(is.na(data$H12))
@@ -363,7 +305,6 @@ analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=
                 data <<- read.table(dataFileName, header=T, skip=2, fill=T, nrows=emptyRows[1]-1, fileEncoding = "latin1")
             }
 
->>>>>>> 9ed833cf0f4afe6e523fab255b47a62959d053ab
             names(data)[1] <<- "Time"
             names(data)[2] <<- "Temperature"
 
@@ -379,11 +320,7 @@ analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=
             }
 
 			# convert time data to seconds
-<<<<<<< HEAD
-            data$Time <- sapply(data$Time, seconds)
-=======
             data$Time <<- sapply(data$Time, seconds)
->>>>>>> 9ed833cf0f4afe6e523fab255b47a62959d053ab
 
 
             message("\nPre-processing wells")
@@ -416,9 +353,6 @@ analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=
                 }
             }
 
-# growth rates ------------------------------------------------------------
-
-
             # calculate growth rates (1st derivative)
             message("\nRates (1st derivative)...")
             rate = tapply(smooth$SmoothedOD, smooth$Well, ratesInterval, smooth$Time, 11, TRUE)
@@ -443,9 +377,6 @@ analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=
         } else {
 
             ############### transformations specific for "08202009-2.txt" data set from Selwyn ###############
-
-# ignore, speficic for Selwyn code ----------------------------------------
-
 
             tmp=read.table(dataFileName, header=T)
             data = data.frame(Time=sapply(tmp$Time, seconds), OD=tmp$OD, Well=tmp$Well)
@@ -515,9 +446,6 @@ analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=
             
             wellNames <<- unique(newdata$Well)
         }
-
-
-# Analyzing wells ---------------------------------------------------------
 
 
         message("\nAnalyzing wells...")
@@ -887,9 +815,6 @@ analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=
             }
         }
     }
-
-
-# Generating figures ------------------------------------------------------
 
 
 
@@ -1378,9 +1303,6 @@ analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=
     message("\nDone.\nRun time: ", sprintf("%imin %02.0fs", runTime[3]%/%60, runTime[3]%%60))
 }
 
-
-
-# Calling the program -----------------------------------------------------
 
 
 
