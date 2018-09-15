@@ -5,23 +5,9 @@
 library(lattice)
 library(reshape2)
 library(readxl)
-# library(lubridate)
 
 
-# convert time data from hh:mm:ss to seconds
-# seconds <- function(time) {
-#     t = as.numeric(noquote(unlist(strsplit(sub("\\.", ":", paste(time)), split=':', fixed=T))))   
-#     min = NULL 
-#     if (length(t) >= 3) {
-#         min = t[1]*60*60+t[2]*60+t[3]
-#     } else {
-#         min = t[1]*60+t[2]
-#     }
-#     
-#     return(min)
-# }
-
-seconds<- function(time){
+seconds<- function(time){ # convert time data from hh:mm:ss to seconds
   sec <- as.numeric(format(time, "%H")) * 3600 + as.numeric(format(time, "%M"))*60 + as.numeric(format(time, "%S"))
 }
 
