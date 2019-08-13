@@ -1,6 +1,6 @@
 # Growth-curve-analysis
-This code is meant to analyse growth curve (OD) of bacteria grown in 96 well plates on a shaking plate reader - Shamoo Lab 
-Is is from an unknown author (ask Anisha/Ramya/Heer if they know the author) but was edited for ease of input by Prashant Kalvapalle
+This code is meant to analyse growth curve (OD vs time) of bacteria grown in 96 well plates on a shaking plate reader - Shamoo Lab. It models growth based on the Gompertz function.
+Original author is Dr. Anisha Perez) but was edited for ease of input by Prashant Kalvapalle
 
 Brief description of it's function
 1. Smoothing ODs
