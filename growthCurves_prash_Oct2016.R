@@ -283,7 +283,7 @@ analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=
     
 
 
-    dataFile = unlist(strsplit(dataFileName, split=".txt", fixed=T))
+    dataFile = unlist(strsplit(dataFileName, split=".csv", fixed=T))
     
     wellsWithZeros = NULL
     if (reload) {
@@ -301,11 +301,11 @@ analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=
 
         message("Loading data from [", dataFileName, "]")
         if (!selwyn) {
-            data <<- read.table(dataFileName, header=T, skip=2, fill=T, fileEncoding = "latin1")
+            data <<- read.table(dataFileName, header=T, skip=57, fill=T, fileEncoding = "latin1")[-1]
 			
             emptyRows=which(is.na(data$H12))
             if (length(emptyRows) != 0) {
-                data <<- read.table(dataFileName, header=T, skip=2, fill=T, nrows=emptyRows[1]-1, fileEncoding = "latin1")
+                data <<- read.table(dataFileName, header=T, skip=57, fill=T, nrows=emptyRows[1]-1, fileEncoding = "latin1")[-1]
             }
 
             names(data)[1] <<- "Time"
