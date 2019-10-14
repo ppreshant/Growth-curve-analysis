@@ -1,211 +1,11 @@
-# Author unknown
+# Author Dr. Anisha Perez (?)(Shamoo Lab at Rice University)
 # edited by Prashant (Shamoo Lab at Rice University)
 # (version 1.3g-120411) <- obsolete number
 
-library(lattice)
-library(reshape2)
-library(readxl)
+# source the file with all the general functions
+source('./growthCurves_general functions.R')
 
-
-seconds<- function(time){ # convert time data from hh:mm:ss to seconds
-  sec <- as.numeric(format(time, "%H")) * 3600 + as.numeric(format(time, "%M"))*60 + as.numeric(format(time, "%S"))
-}
-
-get_seconds <- function(x) { # requires library(lubridate)
-  second(x) + minute(x)*60 + hour(x)*3600
-}
-
-minutesAndSeconds <- function(seconds) {
-  return(c(seconds%/%60, seconds%%60))
-}
-
-avgSmooth <- function(opticalDensities, windowSize, log=T) {
-  if (length(opticalDensities) <= 1) {
-    return(0)
-  }
-  
-  if (log) {
-    opticalDensities = log(opticalDensities)
-  }
-  offset = (windowSize-1)/2
-  expandedODs = c(rep(opticalDensities[1], offset), opticalDensities, rep(opticalDensities[length(opticalDensities)], offset))
-  
-  rates = NULL
-  for (t in (1:length(opticalDensities))+offset) {
-    mean = mean(expandedODs[(t-offset):(t+offset)])
-    rates = c(rates, mean)
-    # message(coef(m)[2])
-  }
-  
-  return(rates)
-}
-
-# calculate derivative of parameter 'opticalDensities' using symmetrical window around data points
-ratesInterval <- function(opticalDensities, times, windowSize, log=T) {
-  if (length(opticalDensities) <= 1) {
-    return(0)
-  }
-  
-  if (log) {
-    opticalDensities = log(opticalDensities)
-  }
-  offset = (windowSize-1)/2
-  expandedODs = c(rep(opticalDensities[1], offset), opticalDensities, rep(opticalDensities[length(opticalDensities)], offset))
-  
-  deltaTime = times[2]-times[1]
-  expandedTimes = c(seq(times[1]-deltaTime, times[1]-offset*deltaTime, -deltaTime), times, seq(times[length(times)]+deltaTime, times[length(times)]+offset*deltaTime, deltaTime))
-  
-  rates = NULL
-  for (t in (1:length(opticalDensities))+offset) {
-    m = lm(expandedODs[(t-offset):(t+offset)] ~ expandedTimes[(t-offset):(t+offset)])
-    rates = c(rates, coef(m)[2])
-    # message(coef(m)[2])
-  }
-  
-  return(rates)
-}
-
-# calculate derivative of parameter 'opticalDensities' using 'windowLeft' and 'windowRight' points around data points
-ratesOffsets <- function(opticalDensities, times, windowLeft, windowRight, log=T) {
-  if (length(opticalDensities) <= 1) {
-    return(0)
-  }
-  
-  if (log) {
-    opticalDensities = log(opticalDensities)
-  }
-  # message(offset)
-  expandedODs = c(rep(opticalDensities[1],windowLeft), opticalDensities, rep(opticalDensities[length(opticalDensities)],windowRight))
-  # print(expandedODs)
-  
-  deltaTime = times[2]-times[1]
-  expandedTimes = c(seq(times[1]-deltaTime,times[1]-windowLeft*deltaTime,-deltaTime), times, seq(times[length(times)]+deltaTime,times[length(times)]+windowRight*deltaTime,deltaTime))
-  
-  slopes = NULL
-  for (i in (1:length(opticalDensities))+windowLeft) {
-    # message(i)
-    m = lm(expandedODs[(i-windowLeft):(i+windowRight)] ~ expandedTimes[(i-windowLeft):(i+windowRight)])
-    slopes = c(slopes, coef(m)[2])
-  }
-  
-  return(slopes)
-}
-
-
-normalize <- function(x) {
-  return((x-min(x))/(max(x)-min(x)) + (min(x)/(max(x)-min(x))))
-}
-
-
-isTwoResourceWell <- function(oneResourceWells, twoResourceWells, well) {
-  if (twoResourceWells[1] == "ALL") {
-    return(TRUE)
-  }
-  
-  if (well %in% twoResourceWells) {
-    return(TRUE)
-  }
-  
-  rowCol = substring(well,1:2,c(1,3))
-  if (rowCol[1] %in% twoResourceWells) {
-    return(TRUE)
-  }
-  if (rowCol[2] %in% twoResourceWells) {
-    return(TRUE)
-  }
-  
-  if (length(oneResourceWells) != 0) {
-    if (well %in% oneResourceWells) {
-      return(FALSE)
-    }
-    
-    rowCol = substring(well,1:2,c(1,3))
-    if (rowCol[1] %in% oneResourceWells) {
-      return(FALSE)
-    }
-    if (rowCol[2] %in% oneResourceWells) {
-      return(FALSE)
-    }
-    
-    return(TRUE)
-  }
-  
-  return(FALSE)
-}
-
-rankPeaks <- function(od, rate, rate1, rate2) {
-  return(1.5*od + (8*rate)^3 + 32*(1-abs(rate1)) - 4*rate2)
-}
-
-
-rankValley <- function(time, od, rate, rate1, rate2) {
-  weightTime = 2
-  weightRate = 2
-  weightRate1 = 10
-  weightRate2 = 7
-  
-  od1 = min(od) + (max(od) - min(od)) * 0.15
-  od2 = min(od) + (max(od) - min(od)) * 0.75
-  time1Index = which(od>od1)[1]
-  time4Index = which(od>od2)[1]
-  time1 = time[time1Index]
-  time4 = time[time4Index]
-  time2 = time1+(time4-time1)*0.2
-  time3 = time1+(time4-time1)*0.5
-  
-  return(weightTime*sapply(time, rankValleyTime, time1, time2, time3, time4, max(time)) + weightRate*sapply(rate, rankValleyRate) + weightRate1*(1-abs(rate1)) + weightRate2*rate2)
-}
-
-rankValleyTime <- function(t, time1, time2, time3, time4, maxT) {
-  if (t < time1 || t >= time4) {
-    return(-0.4 - 1.2*t/maxT)
-  }
-  if (t < time2) {
-    return((t-time1)/(time2-time1)-0.4 - 1.2*t/maxT)
-  }
-  if (t < time3) {
-    return(0.6 - 1.2*t/maxT)
-  }
-  if (t < time4) {
-    return(0.6-(t-time3)/(time4-time3) - 1.2*t/maxT)
-  }
-}
-
-rankValleyRate <- function(x) {
-  if (x >= 0) {
-    return(1-(abs(x))^2)
-  } else {
-    return(1-6*(abs(x))^2)
-  }
-}
-
-
-
-
-
-####### following 2 functions specific for transforming "08202009-2.txt" data set from Selwyn #######
-
-threeCharWell <- function(wellName) {
-  if (nchar(wellName) == 2) {
-    return(paste(substr(wellName,1,1), substr(wellName,2,2), sep="0"))
-  } else {
-    return(wellName)
-  }
-}
-createMissingWell <- function(well, times, od) {
-  tmp = NULL
-  for (t in times) {
-    tmp = rbind(tmp, data.frame(Time=t, OD=od, Well=well))
-  }
-  return(tmp)
-}
-
-
-
-
-
-
-####### main analyses and plotting code starts here #######
+# Declaring variables ----
 
 data = NULL
 newdata = NULL
@@ -222,8 +22,10 @@ wellNames = NULL
 # expGrowths <- NULL
 # models <- list()
 
+# function for analyzing growth curves ----
+# Input the raw plate reader excel file 
+# Reader Type:	Epoch 2
 
-# Convert plate reader excel file into CSV and input into the program
 analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=c(), twoResourceWells=c("ALL"), plotDetail=F, reload=T, smoothWindowSize=7, maxOD=0.45, ODTicks=c(0.1,0.2,0.4), maxTimeHours=15, timeTicks=c(0,5,10,15), rSquaredTreshold=0.85, maxWells=96, selwyn=F) {
   
   # Prelims -----------------------------------------------------------------
@@ -238,7 +40,7 @@ analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=
   maxX = maxTimeSeconds*1.075
   minX = 0-maxTimeSeconds*0.075
   xTicks = timeTicks*60*60
-  if (selwyn) {
+  if (selwyn) { # ignore this section, I don't know what it is (@Prash)
     minY = 0.025
     maxY = 0.8
     yTicks = c(0.03, 0.3, 0.7)
@@ -279,7 +81,7 @@ analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=
   }
   
   
-  
+  # Grabbing the name of the file (removing csv) 
   dataFile = unlist(strsplit(dataFileName, split=".csv", fixed=T))
   
   wellsWithZeros = NULL
@@ -296,9 +98,10 @@ analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=
     models <<- list()
     problems <<- NULL
     
+    # loading and cleaning up data
     message("Loading data from [", dataFileName, "]")
     if (!selwyn) {
-      data <<- read_excel(dataFileName, skip=57)[-1]
+      data <<- read_excel(dataFileName, skip=57)[-1] # loading data from file
       
       emptyRows=which(is.na(data$H12)) # get rid of empty rows in the data
       if (length(emptyRows) != 0) {
@@ -322,7 +125,7 @@ analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=
       }
       
       # convert time data to seconds
-      data$Time <- sapply(data$Time, seconds)
+      data$Time <- sapply(data$Time, get_seconds)
       
       
       message("\nPre-processing wells")
@@ -379,81 +182,81 @@ analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=
       
       
       wellNames <<- as.vector(unique(newdata$Well))
-    } else {
-      
-      ############### transformations specific for "08202009-2.txt" data set from Selwyn ###############
-      
-      # ignore, speficic for Selwyn code ----------------------------------------
-      
-      
-      tmp=read.table(dataFileName, header=T)
-      data = data.frame(Time=sapply(tmp$Time, seconds), OD=tmp$OD, Well=tmp$Well)
-      data$Well=as.vector(data$Well)
-      times=data$Time[data$Well=="A01"]
-      data = rbind(data, createMissingWell("A05", times, 0.01))
-      data = rbind(data, createMissingWell("A10", times, 0.01))
-      data = rbind(data, createMissingWell("A11", times, 0.01))
-      data = rbind(data, createMissingWell("A12", times, 0.01))
-      data = rbind(data, createMissingWell("B05", times, 0.01))
-      data = rbind(data, createMissingWell("B10", times, 0.01))
-      data = rbind(data, createMissingWell("B11", times, 0.01))
-      data = rbind(data, createMissingWell("B12", times, 0.01))
-      data = rbind(data, createMissingWell("C05", times, 0.01))
-      data = rbind(data, createMissingWell("C10", times, 0.01))
-      data = rbind(data, createMissingWell("C11", times, 0.01))
-      data = rbind(data, createMissingWell("C12", times, 0.01))
-      data = rbind(data, createMissingWell("D05", times, 0.01))
-      data = rbind(data, createMissingWell("D10", times, 0.01))
-      data = rbind(data, createMissingWell("D11", times, 0.01))
-      data = rbind(data, createMissingWell("D12", times, 0.01))
-      data = rbind(data, createMissingWell("E05", times, 0.01))
-      data = rbind(data, createMissingWell("E10", times, 0.01))
-      data = rbind(data, createMissingWell("E11", times, 0.01))
-      data = rbind(data, createMissingWell("E12", times, 0.01))
-      data = rbind(data, createMissingWell("F05", times, 0.01))
-      data = rbind(data, createMissingWell("F10", times, 0.01))
-      data = rbind(data, createMissingWell("F11", times, 0.01))
-      data = rbind(data, createMissingWell("F12", times, 0.01))
-      data = rbind(data, createMissingWell("G01", times, 0.01))
-      data = rbind(data, createMissingWell("G02", times, 0.01))
-      data = rbind(data, createMissingWell("G03", times, 0.01))
-      data = rbind(data, createMissingWell("G04", times, 0.01))
-      data = rbind(data, createMissingWell("G05", times, 0.01))
-      data = rbind(data, createMissingWell("G06", times, 0.01))
-      data = rbind(data, createMissingWell("G07", times, 0.01))
-      data = rbind(data, createMissingWell("G08", times, 0.01))
-      data = rbind(data, createMissingWell("G09", times, 0.01))
-      data = rbind(data, createMissingWell("G10", times, 0.01))
-      data = rbind(data, createMissingWell("G11", times, 0.01))
-      data = rbind(data, createMissingWell("G12", times, 0.01))
-      data = rbind(data, createMissingWell("H01", times, 0.01))
-      data = rbind(data, createMissingWell("H02", times, 0.01))
-      data = rbind(data, createMissingWell("H03", times, 0.01))
-      data = rbind(data, createMissingWell("H04", times, 0.01))
-      data = rbind(data, createMissingWell("H05", times, 0.01))
-      data = rbind(data, createMissingWell("H06", times, 0.01))
-      data = rbind(data, createMissingWell("H07", times, 0.01))
-      data = rbind(data, createMissingWell("H08", times, 0.01))
-      data = rbind(data, createMissingWell("H09", times, 0.01))
-      data = rbind(data, createMissingWell("H10", times, 0.01))
-      data = rbind(data, createMissingWell("H11", times, 0.01))
-      data = rbind(data, createMissingWell("H12", times, 0.01))
-      
-      data = data[order(as.vector(sapply(data$Well, threeCharWell)), data$Time),]
-      
-      Rate=tapply(data$OD, data$Well, ratesInterval, times, 9)
-      r=cbind(data, Rate=unlist(Rate))
-      
-      message("\nRates'...")
-      rate1=tapply(r$Rate, r$Well, ratesInterval, times, 7, FALSE)
-      r1=cbind(r, NRate1=unlist(rate1))
-      
-      message("\nRates''...")
-      rate2=tapply(r1$NRate1, r1$Well, ratesOffsets, times, 1, 2, FALSE)
-      newdata = cbind(r1, NRate2=unlist(rate2))
-      
-      wellNames <<- unique(newdata$Well)
-    }
+    } 
+    
+    # ignore, speficic for Selwyn code ----------------------------------------
+    # transformations specific for "08202009-2.txt" data set from Selwyn #
+    
+    # else {
+    # 
+    #   tmp=read.table(dataFileName, header=T)
+    #   data = data.frame(Time=sapply(tmp$Time, get_seconds), OD=tmp$OD, Well=tmp$Well)
+    #   data$Well=as.vector(data$Well)
+    #   times=data$Time[data$Well=="A01"]
+    #   data = rbind(data, createMissingWell("A05", times, 0.01))
+    #   data = rbind(data, createMissingWell("A10", times, 0.01))
+    #   data = rbind(data, createMissingWell("A11", times, 0.01))
+    #   data = rbind(data, createMissingWell("A12", times, 0.01))
+    #   data = rbind(data, createMissingWell("B05", times, 0.01))
+    #   data = rbind(data, createMissingWell("B10", times, 0.01))
+    #   data = rbind(data, createMissingWell("B11", times, 0.01))
+    #   data = rbind(data, createMissingWell("B12", times, 0.01))
+    #   data = rbind(data, createMissingWell("C05", times, 0.01))
+    #   data = rbind(data, createMissingWell("C10", times, 0.01))
+    #   data = rbind(data, createMissingWell("C11", times, 0.01))
+    #   data = rbind(data, createMissingWell("C12", times, 0.01))
+    #   data = rbind(data, createMissingWell("D05", times, 0.01))
+    #   data = rbind(data, createMissingWell("D10", times, 0.01))
+    #   data = rbind(data, createMissingWell("D11", times, 0.01))
+    #   data = rbind(data, createMissingWell("D12", times, 0.01))
+    #   data = rbind(data, createMissingWell("E05", times, 0.01))
+    #   data = rbind(data, createMissingWell("E10", times, 0.01))
+    #   data = rbind(data, createMissingWell("E11", times, 0.01))
+    #   data = rbind(data, createMissingWell("E12", times, 0.01))
+    #   data = rbind(data, createMissingWell("F05", times, 0.01))
+    #   data = rbind(data, createMissingWell("F10", times, 0.01))
+    #   data = rbind(data, createMissingWell("F11", times, 0.01))
+    #   data = rbind(data, createMissingWell("F12", times, 0.01))
+    #   data = rbind(data, createMissingWell("G01", times, 0.01))
+    #   data = rbind(data, createMissingWell("G02", times, 0.01))
+    #   data = rbind(data, createMissingWell("G03", times, 0.01))
+    #   data = rbind(data, createMissingWell("G04", times, 0.01))
+    #   data = rbind(data, createMissingWell("G05", times, 0.01))
+    #   data = rbind(data, createMissingWell("G06", times, 0.01))
+    #   data = rbind(data, createMissingWell("G07", times, 0.01))
+    #   data = rbind(data, createMissingWell("G08", times, 0.01))
+    #   data = rbind(data, createMissingWell("G09", times, 0.01))
+    #   data = rbind(data, createMissingWell("G10", times, 0.01))
+    #   data = rbind(data, createMissingWell("G11", times, 0.01))
+    #   data = rbind(data, createMissingWell("G12", times, 0.01))
+    #   data = rbind(data, createMissingWell("H01", times, 0.01))
+    #   data = rbind(data, createMissingWell("H02", times, 0.01))
+    #   data = rbind(data, createMissingWell("H03", times, 0.01))
+    #   data = rbind(data, createMissingWell("H04", times, 0.01))
+    #   data = rbind(data, createMissingWell("H05", times, 0.01))
+    #   data = rbind(data, createMissingWell("H06", times, 0.01))
+    #   data = rbind(data, createMissingWell("H07", times, 0.01))
+    #   data = rbind(data, createMissingWell("H08", times, 0.01))
+    #   data = rbind(data, createMissingWell("H09", times, 0.01))
+    #   data = rbind(data, createMissingWell("H10", times, 0.01))
+    #   data = rbind(data, createMissingWell("H11", times, 0.01))
+    #   data = rbind(data, createMissingWell("H12", times, 0.01))
+    #   
+    #   data = data[order(as.vector(sapply(data$Well, threeCharWell)), data$Time),]
+    #   
+    #   Rate=tapply(data$OD, data$Well, ratesInterval, times, 9)
+    #   r=cbind(data, Rate=unlist(Rate))
+    #   
+    #   message("\nRates'...")
+    #   rate1=tapply(r$Rate, r$Well, ratesInterval, times, 7, FALSE)
+    #   r1=cbind(r, NRate1=unlist(rate1))
+    #   
+    #   message("\nRates''...")
+    #   rate2=tapply(r1$NRate1, r1$Well, ratesOffsets, times, 1, 2, FALSE)
+    #   newdata = cbind(r1, NRate2=unlist(rate2))
+    #   
+    #   wellNames <<- unique(newdata$Well)
+    # }
     
     
     # Analyzing wells ---------------------------------------------------------
