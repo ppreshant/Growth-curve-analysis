@@ -24,9 +24,9 @@ wellNames = NULL
 
 # function for analyzing growth curves ----
 # Input the raw plate reader excel file 
-# Reader Type:	Epoch 2
+# Reader Type:	Spark
 
-analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=c(), twoResourceWells=c("ALL"), plotDetail=F, reload=T, smoothWindowSize=7, maxOD=0.45, ODTicks=c(0.1,0.2,0.4), maxTimeHours=15, timeTicks=c(0,5,10,15), rSquaredTreshold=0.85, maxWells=96, selwyn=F) {
+analyzeGrowthCurves <- function(dataFileName, sheet_name = 'Sheet 1', singleWell=NULL, oneResourceWells=c(), twoResourceWells=c("ALL"), plotDetail=F, reload=T, smoothWindowSize=7, maxOD=0.45, ODTicks=c(0.1,0.2,0.4), maxTimeHours=15, timeTicks=c(0,5,10,15), rSquaredTreshold=0.85, maxWells=96, selwyn=F) {
   
   # Prelims -----------------------------------------------------------------
   
@@ -81,49 +81,51 @@ analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=
   }
   
   
-  # Grabbing the name of the file (removing csv) 
-  dataFile = unlist(strsplit(dataFileName, split=".csv", fixed=T))
+  # loading data from excel file ----
+  dataFile = unlist(strsplit(dataFileName, split=".xlsx", fixed=T)) # Grabbing the name of the file (removing xlsx) 
   
   wellsWithZeros = NULL
   if (reload) {
-    baseODs <<- NULL
-    lags <<- NULL
-    ranksValley <<- NULL
-    ranksPeak1 <<- NULL
-    ranksPeak2 <<- NULL
-    valleys <<- NULL
-    peak1s <<- NULL
-    peak2s <<- NULL
-    expGrowths <<- NULL
-    models <<- list()
-    problems <<- NULL
+    baseODs <- NULL
+    lags <- NULL
+    ranksValley <- NULL
+    ranksPeak1 <- NULL
+    ranksPeak2 <- NULL
+    valleys <- NULL
+    peak1s <- NULL
+    peak2s <- NULL
+    expGrowths <- NULL
+    models <- list()
+    problems <- NULL
     
     # loading and cleaning up data
     message("Loading data from [", dataFileName, "]")
     if (!selwyn) {
-      data <<- read_excel(dataFileName, skip=57)[-1] # loading data from file
+      data <- read_xlsx(dataFileName, sheet = sheet_name, skip=86, col_names = F) # loading data from file
       
-      emptyRows=which(is.na(data$H12)) # get rid of empty rows in the data
-      if (length(emptyRows) != 0) {
-        data <<- read_excel(dataFileName, n_max = emptyRows[1]-1, skip=57) 
-      }
+      data_tmp <- as.data.frame(data) # read_excel outputs a tibble - convert it back to data frame
+      data <- as.data.frame(t(data_tmp)[-1,-1]); colnames(data) <- data_tmp[-1,1] # transpose the data (for Spark plate reader only)
       
-      data <- as.data.frame(data) # read_excel outputs a tibble - convert it back to data frame
+      # emptyRows=which(is.na(data$H12)) # get rid of empty rows in the data
+      # if (length(emptyRows) != 0) {
+      #   # data <- read_excel(dataFileName, sheet = sheet_name, n_max = emptyRows[1]-1, skip=86, col_names = F) 
+      # }
       
-      names(data)[1] <<- "Time"
-      names(data)[2] <<- "Temperature"
+      names(data)[1] <- "Time"
+      names(data)[2] <- "Temperature"
       
       # remove empty rows at end of file
       emptyRows=which(is.na(data$A1))
       if (length(emptyRows) != 0) {
-        data <<- data[1:emptyRows[1]-1,]
+        data <- data[1:emptyRows[1]-1,]
       } else {
         emptyRows=which(is.na(data$H12))
         if (length(emptyRows) != 0) {
-          data <<- data[1:emptyRows[1]-1,]
+          data <- data[1:emptyRows[1]-1,]
         }
       }
       
+      # processing data ----
       # convert time data to seconds
       data$Time <- sapply(data$Time, get_seconds)
       
@@ -178,10 +180,10 @@ analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=
       message("\nRates'' (3rd derivative)...")
       rate2 = tapply(r1$NRate1, r1$Well, ratesOffsets, data$Time, 3, 5, FALSE)
       #             rate2 = tapply(r1$NRate1, r1$Well, ratesOffsets, data$Time, 4, 6, FALSE)
-      newdata <<- cbind(r1, NRate2=unlist(rate2))
+      newdata <- cbind(r1, NRate2=unlist(rate2))
       
       
-      wellNames <<- as.vector(unique(newdata$Well))
+      wellNames <- as.vector(unique(newdata$Well))
     } 
     
     # ignore, speficic for Selwyn code ----------------------------------------
@@ -255,7 +257,7 @@ analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=
     #   rate2=tapply(r1$NRate1, r1$Well, ratesOffsets, times, 1, 2, FALSE)
     #   newdata = cbind(r1, NRate2=unlist(rate2))
     #   
-    #   wellNames <<- unique(newdata$Well)
+    #   wellNames <- unique(newdata$Well)
     # }
     
     
@@ -277,9 +279,9 @@ analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=
           write(c(wellName, "NA", "NA", "NA", "NA"), analysisFileName, ncolumns=5, append=T)
         }
       } else {
-        newdata$NRate[newdata$Well==wellName] <<- normalize(newdata$NRate[newdata$Well==wellName])
-        newdata$NRate1[newdata$Well==wellName] <<- normalize(newdata$NRate1[newdata$Well==wellName])
-        newdata$NRate2[newdata$Well==wellName] <<- normalize(newdata$NRate2[newdata$Well==wellName])
+        newdata$NRate[newdata$Well==wellName] <- normalize(newdata$NRate[newdata$Well==wellName])
+        newdata$NRate1[newdata$Well==wellName] <- normalize(newdata$NRate1[newdata$Well==wellName])
+        newdata$NRate2[newdata$Well==wellName] <- normalize(newdata$NRate2[newdata$Well==wellName])
         
         # check if growth occured in well
         nTimePoints = length(newdata$OD[newdata$Well==wellName])
@@ -303,7 +305,7 @@ analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=
           }
           
           baseOD = mean(log(newdata$OD[newdata$Well==wellName][baseODdataPoints]))
-          baseODs <<- rbind(baseODs, data.frame(Well=wellName, OD=baseOD))
+          baseODs <- rbind(baseODs, data.frame(Well=wellName, OD=baseOD))
           
           twoResourcesDetected = FALSE
           if (isTwoResourceWell(oneResourceWells, twoResourceWells, wellName)) {
@@ -446,14 +448,14 @@ analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=
             } else {
               twoResourcesDetected = TRUE
               
-              ranksValley <<- rbind(ranksValley, data.frame(Well=wellName, Time=tmp$Time, Rank=valleyRanks))
-              ranksPeak1 <<- rbind(ranksPeak1, data.frame(Well=wellName, Time=tmpLeft$Time, Rank=peak1Ranks))
-              ranksPeak2 <<- rbind(ranksPeak2, data.frame(Well=wellName, Time=tmpRight$Time, Rank=peak2Ranks))
+              ranksValley <- rbind(ranksValley, data.frame(Well=wellName, Time=tmp$Time, Rank=valleyRanks))
+              ranksPeak1 <- rbind(ranksPeak1, data.frame(Well=wellName, Time=tmpLeft$Time, Rank=peak1Ranks))
+              ranksPeak2 <- rbind(ranksPeak2, data.frame(Well=wellName, Time=tmpRight$Time, Rank=peak2Ranks))
               
-              valleys <<- rbind(valleys, valley)
-              peak1s <<- rbind(peak1s, peak1)
-              peak2s <<- rbind(peak2s, peak2)
-              expGrowths <<- rbind(expGrowths, data.frame(Well=wellName, Left1=expGrowth1[1], Peak1=peak1Index, Right1=expGrowth1[length(expGrowth1)], Left2=expGrowth2[1], Peak2=peak2Index, Right2=expGrowth2[length(expGrowth2)]))
+              valleys <- rbind(valleys, valley)
+              peak1s <- rbind(peak1s, peak1)
+              peak2s <- rbind(peak2s, peak2)
+              expGrowths <- rbind(expGrowths, data.frame(Well=wellName, Left1=expGrowth1[1], Peak1=peak1Index, Right1=expGrowth1[length(expGrowth1)], Left2=expGrowth2[1], Peak2=peak2Index, Right2=expGrowth2[length(expGrowth2)]))
               
               model1 = lm(log(newdata$OD[newdata$Well==wellName][expGrowth1]) ~ newdata$Time[newdata$Well==wellName][expGrowth1])
               # print(summary(model))
@@ -467,8 +469,8 @@ analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=
               #                             message("\t", r22)
               c2 = coef(model2)
               
-              models[[length(models)+1]] <<- list(Model1=model1, Model2=model2)
-              names(models) <<- c(names(models)[1:(length(models)-1)], wellName)
+              models[[length(models)+1]] <- list(Model1=model1, Model2=model2)
+              names(models) <- c(names(models)[1:(length(models)-1)], wellName)
               
               
               lag1StartTime = newdata$Time[newdata$Well==wellName][1]
@@ -490,7 +492,7 @@ analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=
               lag2StartTimeExtended = tmp$Time[lag2StartIndex]
               lag2extended = lag2EndTime - lag2StartTimeExtended
               
-              lags <<- rbind(lags, data.frame(Well=wellName, BaseOD=baseOD, Lag1StartTime=lag1StartTime, Lag1EndTime=lag1EndTime, Lag2OD=lag2OD, Lag2StartTime=valley$Time[1], Lag2StartTimeExt=lag2StartTimeExtended, Lag2EndTime=lag2EndTime))
+              lags <- rbind(lags, data.frame(Well=wellName, BaseOD=baseOD, Lag1StartTime=lag1StartTime, Lag1EndTime=lag1EndTime, Lag2OD=lag2OD, Lag2StartTime=valley$Time[1], Lag2StartTimeExt=lag2StartTimeExtended, Lag2EndTime=lag2EndTime))
               
               lag1mns = minutesAndSeconds(lag1)
               lag2mns = minutesAndSeconds(lag2)
@@ -525,7 +527,7 @@ analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=
                 wellProblem = TRUE
               }
               if (wellProblem) {
-                problems <<- rbind(problems, data.frame(Well=wellName))
+                problems <- rbind(problems, data.frame(Well=wellName))
               }
             }
           }
@@ -594,14 +596,14 @@ analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=
             #                         message("\t", r2)
             c = coef(model)
             
-            expGrowths <<- rbind(expGrowths, data.frame(Well=wellName, Left1=expGrowth[1], Peak1=peakIndex, Right1=expGrowth[length(expGrowth)], Left2=NA, Peak2=NA, Right2=NA))
-            models[[length(models)+1]] <<- list(Model1=model)
-            names(models) <<- c(names(models)[1:(length(models)-1)], wellName)
+            expGrowths <- rbind(expGrowths, data.frame(Well=wellName, Left1=expGrowth[1], Peak1=peakIndex, Right1=expGrowth[length(expGrowth)], Left2=NA, Peak2=NA, Right2=NA))
+            models[[length(models)+1]] <- list(Model1=model)
+            names(models) <- c(names(models)[1:(length(models)-1)], wellName)
             
             lagStartTime = tmp$Time[1]
             lagEndTime = (baseOD-c[1])/c[2]
             lag = lagEndTime - lagStartTime
-            lags <<- rbind(lags, data.frame(Well=wellName, BaseOD=baseOD, Lag1StartTime=lagStartTime, Lag1EndTime=lagEndTime, Lag2OD=NA, Lag2StartTime=NA, Lag2StartTimeExt=NA, Lag2EndTime=NA))
+            lags <- rbind(lags, data.frame(Well=wellName, BaseOD=baseOD, Lag1StartTime=lagStartTime, Lag1EndTime=lagEndTime, Lag2OD=NA, Lag2StartTime=NA, Lag2StartTimeExt=NA, Lag2EndTime=NA))
             
             lagmns = minutesAndSeconds(lag)
             message(sprintf("\t%-13s %9.3fs  (%imin %02.0fs)", "LagTime:", lag, lagmns[1], lagmns[2]))
@@ -622,7 +624,7 @@ analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=
               wellProblem = TRUE
             }
             if (wellProblem) {
-              problems <<- rbind(problems, data.frame(Well=wellName))
+              problems <- rbind(problems, data.frame(Well=wellName))
             }
           }
         }
@@ -791,7 +793,7 @@ analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=
       }
     }
     
-    panel.index <<- panel.index + 1
+    panel.index <- panel.index + 1
   })
   
   print(plot)
@@ -915,7 +917,7 @@ analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=
         }
       }
       
-      panel.index <<- panel.index + 1
+      panel.index <- panel.index + 1
     })
     
     print(plot, newpage=TRUE)
@@ -962,7 +964,7 @@ analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=
         }
       }
       
-      panel.index <<- panel.index + 1
+      panel.index <- panel.index + 1
     })
     
     print(plot, newpage=TRUE)
@@ -997,7 +999,7 @@ analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=
           }
         }
         
-        panel.index <<- panel.index + 1
+        panel.index <- panel.index + 1
       })
       
       print(plot, newpage=TRUE)
@@ -1032,7 +1034,7 @@ analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=
         }
       }
       
-      panel.index <<- panel.index + 1
+      panel.index <- panel.index + 1
     })
     
     print(plot, newpage=TRUE)
@@ -1065,7 +1067,7 @@ analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=
           }
         }
         
-        panel.index <<- panel.index + 1
+        panel.index <- panel.index + 1
       })
       
       print(plot, newpage=TRUE)
@@ -1107,7 +1109,7 @@ analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=
           }
         }
         
-        panel.index <<- panel.index + 1
+        panel.index <- panel.index + 1
       })
       
       print(plot, newpage=TRUE)
@@ -1156,4 +1158,5 @@ analyzeGrowthCurves <- function(dataFileName, singleWell=NULL, oneResourceWells=
 
 # analyzeGrowthCurves("VP_12h_DM_NaCl-Glu_Replicate2_10-31-11.txt", twoResourceWells=c("NONE"), maxOD=1.7, ODTicks=c(0.1,0.5,1.5), maxTimeHours=25, timeTicks=c(0,8,16,24), plotDetail=T)
 
-analyzeGrowthCurves("raw data plate reader/TetBpsc101_correct order_replicate3.xlsx", twoResourceWells=c("NONE"), maxOD=1.7, ODTicks=c(0.1,0.5,1.5), maxTimeHours=25, timeTicks=c(0,8,16,24), plotDetail=T)
+flpath = "C:/Users/new/Box Sync/Stadler lab/Data/Plate reader"
+analyzeGrowthCurves(paste0(flpath,"/S015c_kinetic_3-7-19.xlsx"), sheet_name = 'OD', twoResourceWells=c("NONE"), maxOD=1.7, ODTicks=c(0.1,0.5,1.5), maxTimeHours=25, timeTicks=c(0,8,16,24), plotDetail=T)
