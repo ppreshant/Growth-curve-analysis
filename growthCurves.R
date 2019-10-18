@@ -103,8 +103,8 @@ analyzeGrowthCurves <- function(dataFileName, sheet_name = 'Sheet 1', skip_lines
     if (!selwyn) {
       data <- read_xlsx(dataFileName, sheet = sheet_name, skip=skip_lines, col_names = F) # loading data from file
       
-      data_tmp <- as.data.frame(data) # read_excel outputs a tibble - convert it back to data frame
-      data <- as.data.frame(t(data_tmp)[-1,-1]); colnames(data) <- data_tmp[-1,1] # transpose the data (for Spark plate reader only)
+      data_tmp <- as.data.frame(data, stringsAsFactors = F) # read_excel outputs a tibble - convert it back to data frame
+      data <- as.data.frame(t(data_tmp)[-1,-1], stringsAsFactors = F); colnames(data) <- data_tmp[-1,1] # transpose the data (for Spark plate reader only)
       
       # emptyRows=which(is.na(data$H12)) # get rid of empty rows in the data
       # if (length(emptyRows) != 0) {
@@ -115,7 +115,7 @@ analyzeGrowthCurves <- function(dataFileName, sheet_name = 'Sheet 1', skip_lines
       names(data)[2] <- "Temperature"
       
       # remove empty rows at end of file (anything that's not a letter and a number or Time, Temperature)
-      data <- data[grepl( "[A-Z][0-9]+|^Time|^Temp",names(data))]
+      data <- data[grepl( "[A-Z][0-9]+|^Time|^Temp", names(data))]
       
       # convert data to numeric (it is factor by default)
       data <- as.data.frame(lapply(data, as.numeric))
@@ -1123,7 +1123,8 @@ analyzeGrowthCurves <- function(dataFileName, sheet_name = 'Sheet 1', skip_lines
     }
   }
   
-  dev.off()
+  # dev.off()
+  graphics.off()
   
   runTime = proc.time() - ptm
   message("\nDone.\nRun time: ", sprintf("%imin %02.0fs", runTime[3]%/%60, runTime[3]%%60))
