@@ -26,7 +26,7 @@ wellNames = NULL
 # Input the raw plate reader excel file 
 # Reader Type:	Spark
 
-analyzeGrowthCurves <- function(dataFileName, sheet_name = 'Sheet 1', singleWell=NULL, oneResourceWells=c(), twoResourceWells=c("ALL"), plotDetail=F, reload=T, smoothWindowSize=7, maxOD=0.45, ODTicks=c(0.1,0.2,0.4), maxTimeHours=15, timeTicks=c(0,5,10,15), rSquaredTreshold=0.85, maxWells=96, selwyn=F) {
+analyzeGrowthCurves <- function(dataFileName, sheet_name = 'Sheet 1', skip_lines = 50, singleWell=NULL, oneResourceWells=c(), twoResourceWells=c("ALL"), plotDetail=F, reload=T, smoothWindowSize=7, maxOD=0.45, ODTicks=c(0.1,0.2,0.4), maxTimeHours=15, timeTicks=c(0,5,10,15), rSquaredTreshold=0.85, maxWells=96, selwyn=F) {
   
   # Prelims -----------------------------------------------------------------
   
@@ -101,7 +101,7 @@ analyzeGrowthCurves <- function(dataFileName, sheet_name = 'Sheet 1', singleWell
     # loading and cleaning up data
     message("Loading data from [", dataFileName, "]")
     if (!selwyn) {
-      data <- read_xlsx(dataFileName, sheet = sheet_name, skip=86, col_names = F) # loading data from file
+      data <- read_xlsx(dataFileName, sheet = sheet_name, skip=skip_lines, col_names = F) # loading data from file
       
       data_tmp <- as.data.frame(data) # read_excel outputs a tibble - convert it back to data frame
       data <- as.data.frame(t(data_tmp)[-1,-1]); colnames(data) <- data_tmp[-1,1] # transpose the data (for Spark plate reader only)
@@ -114,20 +114,27 @@ analyzeGrowthCurves <- function(dataFileName, sheet_name = 'Sheet 1', singleWell
       names(data)[1] <- "Time"
       names(data)[2] <- "Temperature"
       
-      # remove empty rows at end of file
-      emptyRows=which(is.na(data$A1))
-      if (length(emptyRows) != 0) {
-        data <- data[1:emptyRows[1]-1,]
-      } else {
-        emptyRows=which(is.na(data$H12))
-        if (length(emptyRows) != 0) {
-          data <- data[1:emptyRows[1]-1,]
-        }
-      }
+      # remove empty rows at end of file (anything that's not a letter and a number or Time, Temperature)
+      data <- data[grepl( "[A-Z][0-9]+|^Time|^Temp",names(data))]
+      
+      # convert data to the right types
+      
+      
+      # obsolete code 
+      # emptyRows=which(is.na(data$A1))
+      # if (length(emptyRows) != 0) {
+      #   data <- data[1:emptyRows[1]-1,]
+      # } else {
+      #   emptyRows=which(is.na(data$H12))
+      #   if (length(emptyRows) != 0) {
+      #     data <- data[1:emptyRows[1]-1,]
+      #   }
+      # }
+      
       
       # processing data ----
-      # convert time data to seconds
-      data$Time <- sapply(data$Time, get_seconds)
+      # convert time data to seconds (data is already in seconds)
+      # data$Time <- sapply(data$Time, get_seconds)
       
       
       message("\nPre-processing wells")
@@ -1158,5 +1165,5 @@ analyzeGrowthCurves <- function(dataFileName, sheet_name = 'Sheet 1', singleWell
 
 # analyzeGrowthCurves("VP_12h_DM_NaCl-Glu_Replicate2_10-31-11.txt", twoResourceWells=c("NONE"), maxOD=1.7, ODTicks=c(0.1,0.5,1.5), maxTimeHours=25, timeTicks=c(0,8,16,24), plotDetail=T)
 
-flpath = "C:/Users/new/Box Sync/Stadler lab/Data/Plate reader"
-analyzeGrowthCurves(paste0(flpath,"/S015c_kinetic_3-7-19.xlsx"), sheet_name = 'OD', twoResourceWells=c("NONE"), maxOD=1.7, ODTicks=c(0.1,0.5,1.5), maxTimeHours=25, timeTicks=c(0,8,16,24), plotDetail=T)
+flpath = "C:/Users/new/Desktop"
+analyzeGrowthCurves(paste0(flpath,"/09_10_19_media_scan_Pfluorescens.xlsx"), sheet_name = 'Result sheet', skip_lines = 50, twoResourceWells=c("NONE"), maxOD=1.7, ODTicks=c(0.1,0.5,1.5), maxTimeHours=25, timeTicks=c(0,8,16,24), plotDetail=T)
