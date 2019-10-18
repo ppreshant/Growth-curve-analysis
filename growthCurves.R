@@ -117,8 +117,8 @@ analyzeGrowthCurves <- function(dataFileName, sheet_name = 'Sheet 1', skip_lines
       # remove empty rows at end of file (anything that's not a letter and a number or Time, Temperature)
       data <- data[grepl( "[A-Z][0-9]+|^Time|^Temp",names(data))]
       
-      # convert data to the right types
-      
+      # convert data to numeric (it is factor by default)
+      data <- as.data.frame(lapply(data, as.numeric))
       
       # obsolete code 
       # emptyRows=which(is.na(data$A1))
@@ -147,8 +147,8 @@ analyzeGrowthCurves <- function(dataFileName, sheet_name = 'Sheet 1', skip_lines
         firstWellName = singleWell
       }
       
-      if (length(which(data[[firstWellName]]==0)) > 0) {
-        data[[firstWellName]][which(data[[firstWellName]]==0)] = 0.001
+      if (sum(is.na(data[[firstWellName]])) > 0) {
+        data[[firstWellName]][is.na(data[[firstWellName]])] = 0.001
         wellsWithZeros = c(wellsWithZeros, firstWellName)
         message("*** ", firstWellName, " contains zero-value data points ***")
       }
@@ -158,8 +158,8 @@ analyzeGrowthCurves <- function(dataFileName, sheet_name = 'Sheet 1', skip_lines
         for (w in 2:(min(maxWells, length(data)-2))) {
           wellName = names(data)[w+2]
           # message(wellName)
-          if (length(which(data[,w+2]==0)) > 0) {
-            data[,w+2][which(data[,w+2]==0)] = 0.001
+          if (sum(is.na(data[,w+2])) > 0) {
+            data[,w+2][is.na(data[,w+2])] = 0.001
             wellsWithZeros = c(wellsWithZeros, wellName)
             message("*** ", wellName, " contains zero-value data points ***")
           }
@@ -1166,4 +1166,4 @@ analyzeGrowthCurves <- function(dataFileName, sheet_name = 'Sheet 1', skip_lines
 # analyzeGrowthCurves("VP_12h_DM_NaCl-Glu_Replicate2_10-31-11.txt", twoResourceWells=c("NONE"), maxOD=1.7, ODTicks=c(0.1,0.5,1.5), maxTimeHours=25, timeTicks=c(0,8,16,24), plotDetail=T)
 
 flpath = "C:/Users/new/Desktop"
-analyzeGrowthCurves(paste0(flpath,"/09_10_19_media_scan_Pfluorescens.xlsx"), sheet_name = 'Result sheet', skip_lines = 50, twoResourceWells=c("NONE"), maxOD=1.7, ODTicks=c(0.1,0.5,1.5), maxTimeHours=25, timeTicks=c(0,8,16,24), plotDetail=T)
+analyzeGrowthCurves(paste0(flpath,"/09_10_19_media_scan_Pfluorescens.xlsx"), sheet_name = 'Result sheet', skip_lines = 50, twoResourceWells=c("NONE"), maxOD=1.7, ODTicks=c(0.1,0.5,1.5), maxTimeHours=41, timeTicks=c(0,8,16,24,32,40), plotDetail=T)
